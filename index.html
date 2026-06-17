@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Symmetrie-Trainer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Symmetrie-Trainer</h1>
+      <p>Wie viele Symmetrieachsen hat die Figur?</p>
+    </header>
+
+    <section class="card">
+      <div class="topbar">
+        <div id="levelText">Grundschule</div>
+        <button id="newTaskBtn">Neue Figur</button>
+      </div>
+
+      <svg id="canvas" viewBox="0 0 500 500" aria-label="Geometrische Figur"></svg>
+
+      <div class="answers" id="answers"></div>
+
+      <div id="feedback" class="feedback hidden"></div>
+    </section>
+
+    <section class="info">
+      <h2>Merke</h2>
+      <p>Eine Symmetrieachse ist eine Faltlinie. Wenn beide Hälften genau aufeinanderpassen, ist es eine Symmetrieachse.</p>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
