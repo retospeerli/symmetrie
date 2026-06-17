@@ -73,13 +73,8 @@ button:disabled { opacity: 0.55; cursor: default; }
   fill: #93c5fd;
   stroke: #1e3a8a;
   stroke-width: 5;
-  stroke-linejoin: round;
-}
-
-.arc-shape {
-  fill: #bfdbfe;
-  stroke: #1e3a8a;
-  stroke-width: 5;
+  stroke-linejoin: miter;
+  stroke-miterlimit: 10;
 }
 
 .axis {
@@ -117,6 +112,9 @@ button:disabled { opacity: 0.55; cursor: default; }
   font-size: 1.15rem;
   font-weight: 700;
 }
+
+.axes-hidden { visibility: hidden; }
+.axes-visible { visibility: visible; }
 
 .hidden { display: none; }
 
