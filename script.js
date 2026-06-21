@@ -1,219 +1,69 @@
-const svg = document.getElementById('drawing');
-const shapeLayer = document.getElementById('shapeLayer');
-const axisLayer = document.getElementById('axisLayer');
-const feedback = document.getElementById('feedback');
-const taskName = document.getElementById('taskName');
-const answerButtons = [...document.querySelectorAll('[data-answer]')];
-const newTaskButton = document.getElementById('newTask');
+const svg = document.getElementById('svg');
+const msg = document.getElementById('message');
+const nextBtn = document.getElementById('next');
+const correctEl = document.getElementById('correct');
+const triesEl = document.getElementById('tries');
+const buttons = [...document.querySelectorAll('[data-answer]')];
 
-const W = 600;
-const H = 420;
-const cx = 300;
-const cy = 210;
-const GRID = 20;
-let currentTask = null;
+const W = 600, H = 420, GRID = 30;
+let correct = 0, tries = 0, current = null;
+const used = new Map();
 
-function el(name, attrs = {}) {
-  const node = document.createElementNS('http://www.w3.org/2000/svg', name);
-  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
-  return node;
+function S(tag, attrs={}, parent=svg){ const e=document.createElementNS('http://www.w3.org/2000/svg', tag); for(const [k,v] of Object.entries(attrs)) e.setAttribute(k,v); parent.appendChild(e); return e; }
+const P = pts => pts.map(p=>p.join(',')).join(' ');
+
+function grid(){
+  S('rect',{x:0,y:0,width:W,height:H,fill:'#fff'});
+  for(let x=0;x<=W;x+=GRID) S('line',{x1:x,y1:0,x2:x,y2:H,stroke:'#b8d1ea','stroke-width': x%150===0?1.3:.8});
+  for(let y=0;y<=H;y+=GRID) S('line',{x1:0,y1:y,x2:W,y2:y,stroke:'#b8d1ea','stroke-width': y%150===0?1.3:.8});
 }
+function poly(pts){ S('polygon',{points:P(pts),fill:'rgba(78,131,189,.10)',stroke:'#4e83bd','stroke-width':4,'stroke-linejoin':'miter'}); }
+function path(d){ S('path',{d,fill:'rgba(78,131,189,.10)',stroke:'#4e83bd','stroke-width':4,'stroke-linejoin':'miter','stroke-linecap':'butt'}); }
+function circle(cx,cy,r){ S('circle',{cx,cy,r,fill:'#fff',stroke:'#4e83bd','stroke-width':4}); }
+function axes(lines){ const g=S('g',{id:'axes',visibility:'hidden'}); lines.forEach(l=>S('line',{x1:l[0],y1:l[1],x2:l[2],y2:l[3],stroke:'#e45b3f','stroke-width':4,'stroke-dasharray':'12 8','stroke-linecap':'round'},g)); }
 
-function clear() {
-  shapeLayer.innerHTML = '';
-  axisLayer.innerHTML = '';
-  axisLayer.classList.add('hiddenAxes');
-  answerButtons.forEach(b => b.classList.remove('correct', 'wrong'));
-}
-
-function pointsToString(points) {
-  return points.map(p => `${p.x},${p.y}`).join(' ');
-}
-
-function addPolygon(points) {
-  shapeLayer.appendChild(el('polygon', { points: pointsToString(points), class: 'shape' }));
-  points.forEach(p => shapeLayer.appendChild(el('circle', { cx: p.x, cy: p.y, r: 4, class: 'vertex' })));
-}
-
-function addCircle(x, y, r) {
-  shapeLayer.appendChild(el('circle', { cx: x, cy: y, r, class: 'shape' }));
-  shapeLayer.appendChild(el('circle', { cx: x, cy: y, r: 4, class: 'centerPoint' }));
-}
-
-function addSemicircle(x, y, r, direction = 'up') {
-  const sweep = direction === 'up' ? 0 : 1;
-  const d = `M ${x - r} ${y} A ${r} ${r} 0 0 ${sweep} ${x + r} ${y} L ${x - r} ${y} Z`;
-  shapeLayer.appendChild(el('path', { d, class: 'arcShape' }));
-  [[x-r,y],[x+r,y],[x,y]].forEach(([px,py],i)=>shapeLayer.appendChild(el('circle',{cx:px,cy:py,r:i===2?4:4,class:i===2?'centerPoint':'vertex'})));
-}
-
-function addQuarterCircle(x, y, r) {
-  // Viertelkreis-Sektor: Mittelpunkt, beide Randpunkte liegen exakt auf Rasterlinien.
-  const d = `M ${x} ${y} L ${x + r} ${y} A ${r} ${r} 0 0 1 ${x} ${y + r} Z`;
-  shapeLayer.appendChild(el('path', { d, class: 'arcShape' }));
-  [[x,y],[x+r,y],[x,y+r]].forEach(([px,py],i)=>shapeLayer.appendChild(el('circle',{cx:px,cy:py,r:4,class:i===0?'centerPoint':'vertex'})));
-}
-
-function addAxis(x1, y1, x2, y2) {
-  axisLayer.appendChild(el('line', { x1, y1, x2, y2, class: 'axis' }));
-}
-
-function addAxes(axes) {
-  axes.forEach(a => addAxis(...a));
-}
-
-// Alle Figuren sind bewusst auf ein 20er-Raster gelegt.
-// Symmetrieachsen werden mit denselben Raster-Koordinaten gezeichnet.
-const tasks = [
-  {
-    name: 'Gleichschenkliges Dreieck',
-    answer: 1,
-    draw() {
-      addPolygon([{x:300,y:70},{x:180,y:310},{x:420,y:310}]);
-      addAxes([[300,45,300,340]]);
-    }
-  },
-  {
-    name: 'Gleichseitiges Dreieck, rasterklar gezeichnet',
-    answer: 3,
-    draw() {
-      // Mathematisch wirklich gleichseitig wäre auf einem Quadratraster nie perfekt mit allen Eckpunkten auf Rasterlinien möglich.
-      // Für die Grundschule nutzen wir deshalb ein sehr klares symmetrisches Dreieck mit drei sichtbar konstruierten Achsen.
-      // Die Achsen laufen exakt durch Ecke und gegenüberliegende Seitenmitte.
-      const A = {x:300,y:70};
-      const B = {x:160,y:330};
-      const C = {x:440,y:330};
-      addPolygon([A,B,C]);
-      const mBC = {x:300,y:330};
-      const mAC = {x:370,y:200};
-      const mAB = {x:230,y:200};
-      addAxes([
-        [A.x,A.y-25,mBC.x,mBC.y+30],
-        [B.x-20,B.y+15,mAC.x+30,mAC.y-25],
-        [C.x+20,C.y+15,mAB.x-30,mAB.y-25]
-      ]);
-    }
-  },
-  {
-    name: 'Rechteck',
-    answer: 2,
-    draw() {
-      addPolygon([{x:180,y:110},{x:420,y:110},{x:420,y:310},{x:180,y:310}]);
-      addAxes([[300,80,300,340],[150,210,450,210]]);
-    }
-  },
-  {
-    name: 'Quadrat',
-    answer: 4,
-    draw() {
-      addPolygon([{x:180,y:90},{x:420,y:90},{x:420,y:330},{x:180,y:330}]);
-      addAxes([[300,60,300,360],[150,210,450,210],[160,70,440,350],[440,70,160,350]]);
-    }
-  },
-  {
-    name: 'Raute mit zwei Achsen',
-    answer: 2,
-    draw() {
-      addPolygon([{x:300,y:70},{x:460,y:210},{x:300,y:350},{x:140,y:210}]);
-      addAxes([[300,45,300,375],[110,210,490,210]]);
-    }
-  },
-  {
-    name: 'Drachenviereck',
-    answer: 1,
-    draw() {
-      addPolygon([{x:300,y:60},{x:420,y:190},{x:300,y:360},{x:180,y:190}]);
-      addAxes([[300,35,300,385]]);
-    }
-  },
-  {
-    name: 'Regelmässiges Sechseck',
-    answer: 2,
-    draw() {
-      // Flache Ober- und Unterseite; alle Ecken auf Rasterpunkten.
-      addPolygon([{x:220,y:90},{x:380,y:90},{x:460,y:210},{x:380,y:330},{x:220,y:330},{x:140,y:210}]);
-      addAxes([[300,60,300,360],[110,210,490,210]]);
-    }
-  },
-  {
-    name: 'Unregelmässiges Vieleck',
-    answer: 0,
-    draw() {
-      addPolygon([{x:160,y:90},{x:360,y:70},{x:460,y:170},{x:420,y:310},{x:240,y:350},{x:120,y:230}]);
-    }
-  },
-  {
-    name: 'Unregelmässiges Fünfeck',
-    answer: 0,
-    draw() {
-      addPolygon([{x:260,y:70},{x:440,y:130},{x:400,y:330},{x:180,y:310},{x:140,y:170}]);
-    }
-  },
-  {
-    name: 'Halbkreis',
-    answer: 1,
-    draw() {
-      addSemicircle(300,260,140,'up');
-      addAxes([[300,90,300,330]]);
-    }
-  },
-  {
-    name: 'Viertelkreis-Sektor',
-    answer: 1,
-    draw() {
-      addQuarterCircle(220,120,220);
-      addAxes([[195,95,465,365]]);
-    }
-  },
-  {
-    name: 'Kreis',
-    answer: 4,
-    draw() {
-      // Für Grundschule hier als Auswahlaufgabe: vier markierbare Beispielachsen.
-      addCircle(300,210,140);
-      addAxes([[300,50,300,370],[140,210,460,210],[185,95,415,325],[415,95,185,325]]);
-    }
-  }
+// Figuren nach Vorbild der PDF-Seite mit Symmetriefiguren: I-Form, freie Vielecke, Blattformen, Haus-/Kronenformen usw.
+const figs = [
+  {name:'Quadrat gross', a:4, draw(){poly([[210,90],[390,90],[390,270],[210,270]]); axes([[300,45,300,315],[165,180,435,180],[190,70,410,290],[410,70,190,290]]);}},
+  {name:'Quadrat klein', a:4, draw(){poly([[240,120],[360,120],[360,240],[240,240]]); axes([[300,75,300,285],[195,180,405,180],[220,100,380,260],[380,100,220,260]]);}},
+  {name:'Rechteck breit', a:2, draw(){poly([[150,120],[450,120],[450,240],[150,240]]); axes([[300,75,300,285],[105,180,495,180]]);}},
+  {name:'Rechteck hoch', a:2, draw(){poly([[240,60],[360,60],[360,330],[240,330]]); axes([[300,30,300,360],[195,195,405,195]]);}},
+  {name:'Raute breit', a:2, draw(){poly([[300,75],[480,195],[300,315],[120,195]]); axes([[300,45,300,345],[90,195,510,195]]);}},
+  {name:'Raute schmal', a:2, draw(){poly([[300,45],[405,195],[300,345],[195,195]]); axes([[300,15,300,375],[165,195,435,195]]);}},
+  {name:'Drachenraute', a:1, draw(){poly([[300,45],[420,180],[300,345],[210,180]]); axes([[300,15,300,375]]);}},
+  {name:'Drachen klein', a:1, draw(){poly([[300,75],[390,180],[300,300],[240,180]]); axes([[300,45,300,330]]);}},
+  {name:'Gleichseitiges Dreieck', a:3, draw(){poly([[300,60],[150,330],[450,330]]); axes([[300,35,300,350],[128,345,322,0],[472,345,278,0]]);}},
+  {name:'Gleichschenkliges Dreieck', a:1, draw(){poly([[300,60],[150,300],[450,300]]); axes([[300,30,300,330]]);}},
+  {name:'Regelmässiges Sechseck', a:3, draw(){poly([[210,105],[390,105],[480,210],[390,315],[210,315],[120,210]]); axes([[300,75,300,345],[105,210,495,210],[150,85,450,335]]);}},
+  {name:'I-Träger', a:2, draw(){poly([[150,75],[450,75],[450,120],[330,120],[330,300],[450,300],[450,345],[150,345],[150,300],[270,300],[270,120],[150,120]]); axes([[300,45,300,375],[120,210,480,210]]);}},
+  {name:'T-Form', a:1, draw(){poly([[150,75],[450,75],[450,135],[330,135],[330,345],[270,345],[270,135],[150,135]]); axes([[300,45,300,375]]);}},
+  {name:'Pluszeichen', a:4, draw(){poly([[270,60],[330,60],[330,150],[420,150],[420,210],[330,210],[330,300],[270,300],[270,210],[180,210],[180,150],[270,150]]); axes([[300,30,300,330],[150,180,450,180],[175,55,425,305],[425,55,175,305]]);}},
+  {name:'Kreuz breit', a:2, draw(){poly([[240,60],[360,60],[360,150],[480,150],[480,240],[360,240],[360,330],[240,330],[240,240],[120,240],[120,150],[240,150]]); axes([[300,30,300,360],[90,195,510,195]]);}},
+  {name:'Symmetrisches Haus', a:1, draw(){poly([[180,180],[300,60],[420,180],[420,330],[180,330]]); axes([[300,30,300,360]]);}},
+  {name:'Haus mit Kamin asymmetrisch', a:0, draw(){poly([[180,180],[300,60],[420,180],[420,330],[180,330],[180,180],[360,120],[360,75],[405,75],[405,165]]); axes([]);}},
+  {name:'Krone', a:1, draw(){poly([[150,300],[150,150],[240,225],[300,90],[360,225],[450,150],[450,300]]); axes([[300,60,300,330]]);}},
+  {name:'Schild', a:1, draw(){poly([[180,90],[420,90],[420,210],[300,345],[180,210]]); axes([[300,60,300,375]]);}},
+  {name:'Pfeil', a:1, draw(){poly([[120,180],[300,60],[480,180],[390,180],[390,300],[210,300],[210,180]]); axes([[300,30,300,330]]);}},
+  {name:'Sanduhr', a:2, draw(){poly([[180,75],[420,75],[300,210],[420,345],[180,345],[300,210]]); axes([[300,45,300,375],[150,210,450,210]]);}},
+  {name:'Achteck unregelmässig symmetrisch', a:2, draw(){poly([[210,90],[390,90],[480,180],[480,240],[390,330],[210,330],[120,240],[120,180]]); axes([[300,60,300,360],[90,210,510,210]]);}},
+  {name:'Blüte drei Blätter', a:3, draw(){path('M300 210 C300 120 240 90 210 150 C180 210 240 240 300 210 C360 240 420 210 390 150 C360 90 300 120 300 210 C240 240 240 330 300 330 C360 330 360 240 300 210 Z'); axes([[300,90,300,360],[180,120,420,300],[420,120,180,300]]);}},
+  {name:'Blattpaar', a:1, draw(){path('M300 300 C210 270 180 180 300 120 C420 180 390 270 300 300 Z'); path('M300 300 C300 210 210 180 180 90 C300 120 360 210 300 300 Z'); axes([[300,60,300,330]]);}},
+  {name:'Rundes Blatt', a:1, draw(){path('M300 75 C420 120 450 240 300 345 C150 240 180 120 300 75 Z'); axes([[300,45,300,375]]);}},
+  {name:'Wappen mit zwei Löchern', a:1, draw(){path('M180 120 C120 165 120 255 180 300 L240 300 L300 345 L360 300 L420 300 C480 255 480 165 420 120 L360 120 L300 75 L240 120 Z'); circle(240,210,24); circle(360,210,24); axes([[300,45,300,375]]);}},
+  {name:'Stern vierfach', a:4, draw(){poly([[300,60],[345,150],[450,150],[375,225],[405,330],[300,270],[195,330],[225,225],[150,150],[255,150]]); axes([[300,30,300,360],[120,195,480,195],[165,60,435,330],[435,60,165,330]]);}},
+  {name:'Asymmetrisches Fünfeck', a:0, draw(){poly([[180,90],[390,120],[450,270],[300,345],[150,240]]); axes([]);}},
+  {name:'Asymmetrischer Blitz', a:0, draw(){poly([[240,60],[420,60],[330,180],[450,180],[210,360],[285,225],[165,225]]); axes([]);}},
+  {name:'Unregelmässiges Vieleck', a:0, draw(){poly([[150,90],[360,60],[450,180],[390,330],[210,300],[120,210]]); axes([]);}},
+  {name:'Schiefe Fahne', a:0, draw(){poly([[180,90],[420,120],[390,240],[210,210],[210,345],[180,345]]); axes([]);}},
+  {name:'Spirale eckig asymmetrisch', a:0, draw(){path('M180 90 L420 90 L420 330 L150 330 L150 150 L360 150 L360 270 L210 270 L210 210 L300 210'); axes([]);}},
 ];
 
-function pickTask() {
-  let next;
-  do {
-    next = tasks[Math.floor(Math.random() * tasks.length)];
-  } while (tasks.length > 1 && next === currentTask);
-  return next;
-}
-
-function newTask() {
-  clear();
-  currentTask = pickTask();
-  taskName.textContent = currentTask.name;
-  currentTask.draw();
-  feedback.textContent = 'Wähle eine Antwort.';
-}
-
-function answer(value, button) {
-  const n = Number(value);
-  axisLayer.classList.remove('hiddenAxes');
-  answerButtons.forEach(b => b.disabled = true);
-  if (n === currentTask.answer) {
-    button.classList.add('correct');
-    feedback.textContent = `Richtig: Diese Figur hat ${currentTask.answer} Symmetrieachse${currentTask.answer === 1 ? '' : 'n'}.`;
-  } else {
-    button.classList.add('wrong');
-    const correctButton = answerButtons.find(b => Number(b.dataset.answer) === currentTask.answer);
-    if (correctButton) correctButton.classList.add('correct');
-    feedback.textContent = `Nicht ganz: Diese Figur hat ${currentTask.answer} Symmetrieachse${currentTask.answer === 1 ? '' : 'n'}.`;
-  }
-}
-
-answerButtons.forEach(button => {
-  button.addEventListener('click', () => answer(button.dataset.answer, button));
-});
-
-newTaskButton.addEventListener('click', () => {
-  answerButtons.forEach(b => b.disabled = false);
-  newTask();
-});
-
-newTask();
+function drawFigure(f){ svg.innerHTML=''; grid(); f.draw(); }
+function available(){ return figs.filter(f => (used.get(f.name)||0) < 2); }
+function pick(){ let pool=available(); if(pool.length===0){used.clear(); pool=figs;} const f=pool[Math.floor(Math.random()*pool.length)]; used.set(f.name,(used.get(f.name)||0)+1); return f; }
+function next(){ if(correct>=30){ finish(); return; } current=pick(); drawFigure(current); msg.textContent='Wähle eine Antwort.'; msg.className=''; nextBtn.hidden=true; buttons.forEach(b=>b.disabled=false); }
+function showAxes(){ const g=document.getElementById('axes'); if(g) g.setAttribute('visibility','visible'); }
+function finish(){ svg.innerHTML=''; grid(); S('text',{x:300,y:170,'text-anchor':'middle','font-size':34,'font-weight':800,fill:'#1b2a38'}).textContent='Geschafft!'; S('text',{x:300,y:220,'text-anchor':'middle','font-size':22,fill:'#1b2a38'}).textContent=`30 richtige Figuren in ${tries} Versuchen.`; buttons.forEach(b=>b.disabled=true); nextBtn.hidden=true; msg.textContent='Sehr gut gearbeitet.'; }
+buttons.forEach(b=>b.addEventListener('click',()=>{ if(!current) return; tries++; triesEl.textContent=tries; const ans=Number(b.dataset.answer); showAxes(); buttons.forEach(x=>x.disabled=true); if(ans===current.a){ correct++; correctEl.textContent=correct; msg.textContent=`Richtig: ${current.a} ${current.a===1?'Symmetrieachse':'Symmetrieachsen'}.`; msg.className='correct'; } else { msg.textContent=`Nicht ganz: Diese Figur hat ${current.a} ${current.a===1?'Symmetrieachse':'Symmetrieachsen'}.`; msg.className='wrong'; } nextBtn.hidden=false; if(correct>=30) nextBtn.textContent='Auswertung anzeigen'; }));
+nextBtn.addEventListener('click',()=>{ nextBtn.textContent='Nächste Figur'; next(); });
+next();
