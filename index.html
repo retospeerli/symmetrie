@@ -1,37 +1,30 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Symmetrieachsen – Geometrie-Trainer</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Symmetrieachsen-Trainer</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="app">
-    <header>
-      <h1>Symmetrieachsen</h1>
-      <p>Erkenne, wie viele Symmetrieachsen die Figur hat.</p>
-    </header>
-
-    <section class="panel stats">
+    <h1>Symmetrieachsen-Trainer</h1>
+    <p class="lead">Wie viele Symmetrieachsen hat die Figur?</p>
+    <section class="topbar">
       <span>Richtig: <strong id="correct">0</strong> / 30</span>
       <span>Versuche: <strong id="tries">0</strong></span>
-      <span>Aufgabe: <strong id="taskType">–</strong></span>
+      <span id="modeLabel">Aufgabe</span>
     </section>
-
-    <section class="task panel">
-      <div id="question">Wie viele Symmetrieachsen hat die Figur?</div>
-      <svg id="svg" viewBox="0 0 600 420" role="img" aria-label="Geometrische Figur auf Raster"></svg>
-      <div class="answers" id="answers">
-        <button data-answer="0">0 Achsen</button>
-        <button data-answer="1">1 Achse</button>
-        <button data-answer="2">2 Achsen</button>
-        <button data-answer="3">3 Achsen</button>
-        <button data-answer="4">4 Achsen</button>
-      </div>
-      <div id="message" class="message">Wähle eine Antwort.</div>
-      <button id="next" class="next" hidden>Nächste Figur</button>
-    </section>
+    <svg id="svg" viewBox="0 0 600 420" aria-label="Geometrische Figur"></svg>
+    <div class="buttons">
+      <button data-answer="0">0 Achsen</button>
+      <button data-answer="1">1 Achse</button>
+      <button data-answer="2">2 Achsen</button>
+      <button data-answer="3">3 Achsen</button>
+      <button data-answer="4">4 Achsen</button>
+    </div>
+    <p id="message">Wähle eine Antwort.</p>
+    <button id="next" hidden>Nächste Figur</button>
   </main>
   <script src="script.js"></script>
 </body>
