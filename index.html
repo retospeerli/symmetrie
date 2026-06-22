@@ -3,26 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Symmetrie-Trainer</title>
+  <title>Symmetrieachsen – Grundschule</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="app">
     <header>
-      <h1>Symmetrie-Trainer</h1>
+      <h1>Symmetrieachsen erkennen</h1>
       <p>Wie viele Symmetrieachsen hat die Figur?</p>
     </header>
 
-    <section class="status">
-      <span>Richtig: <strong id="correct">0</strong> / 30</span>
-      <span>Versuche: <strong id="tries">0</strong></span>
+    <section class="stats" aria-label="Spielstand">
+      <div><strong id="correct">0</strong><span> richtig</span></div>
+      <div><strong id="tries">0</strong><span> Versuche</span></div>
+      <div><strong>30</strong><span> Ziel</span></div>
     </section>
 
-    <section class="stage">
-      <svg id="svg" viewBox="0 0 600 420" role="img" aria-label="Geometrische Figur auf Raster"></svg>
+    <section class="board">
+      <svg id="svg" viewBox="0 0 600 420" role="img" aria-label="Geometrische Figur auf kariertem Raster"></svg>
     </section>
 
-    <section id="buttons" class="buttons" aria-label="Antworten">
+    <section class="controls" aria-label="Antworten">
       <button data-answer="0">0 Achsen</button>
       <button data-answer="1">1 Achse</button>
       <button data-answer="2">2 Achsen</button>
@@ -30,11 +31,10 @@
       <button data-answer="4">4 Achsen</button>
     </section>
 
-    <section class="feedback">
-      <div id="message">Wähle eine Antwort.</div>
-      <button id="next" class="secondary" hidden>Nächste Figur</button>
-    </section>
+    <p id="message" class="message">Wähle eine Antwort.</p>
+    <button id="next" class="next" hidden>Nächste Figur</button>
   </main>
+
   <script src="script.js"></script>
 </body>
 </html>
