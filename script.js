@@ -1,114 +1,71 @@
-/*
-  Symmetrieachsen-Trainer – Variante B
-  Jede Figur besteht aus Rasterpunkten. Die App berechnet die Symmetrieachsen selbst:
-  Ein Punkt wird an einer Kandidatenachse gespiegelt. Nur wenn jeder Spiegelpunkt wieder
-  in der Figur existiert, ist die Achse gültig. Angezeigt werden nur geprüfte Achsen.
-*/
-const svg = document.getElementById('svg');
-const msg = document.getElementById('message');
-const nextBtn = document.getElementById('next');
-const correctEl = document.getElementById('correct');
-const triesEl = document.getElementById('tries');
-const taskTypeEl = document.getElementById('taskType');
-const questionEl = document.getElementById('question');
-const buttons = [...document.querySelectorAll('[data-answer]')];
 
-const W=600,H=420,G=30,CX=10,CY=7; // Raster: 20 x 14, Zentrum (10|7)
-let correct=0, tries=0, current=null;
-const used = new Map();
+const svg=document.getElementById("svg"),msg=document.getElementById("message"),nextBtn=document.getElementById("next"),correctEl=document.getElementById("correct"),triesEl=document.getElementById("tries"),modeLabel=document.getElementById("modeLabel"),buttons=[...document.querySelectorAll("[data-answer]")];
+const W=600,H=420,GRID=30,EPS=1e-6;
+let correct=0,tries=0,current=null;
+const used=new Map();
 
-function S(tag, attrs={}, parent=svg){const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);parent.appendChild(e);return e;}
-const px=p=>[p[0]*G,p[1]*G];
-const key=p=>`${p[0]},${p[1]}`;
-const P=pts=>pts.map(p=>px(p).join(',')).join(' ');
-function clear(){svg.innerHTML='';}
-function grid(){S('rect',{x:0,y:0,width:W,height:H,fill:'#fff'});for(let x=0;x<=W;x+=G)S('line',{x1:x,y1:0,x2:x,y2:H,stroke:'#bfd7f0','stroke-width':x%(G*5)===0?1.6:.9});for(let y=0;y<=H;y+=G)S('line',{x1:0,y1:y,x2:W,y2:y,stroke:'#bfd7f0','stroke-width':y%(G*5)===0?1.6:.9});}
-function poly(pts, extra={}){S('polygon',{points:P(pts),fill:'rgba(78,131,189,.13)',stroke:'#4e83bd','stroke-width':5,'stroke-linejoin':'miter',...extra});}
-function axisLine(axis){
-  if(axis==='v') return [CX*G, 1*G, CX*G, 13*G];
-  if(axis==='h') return [2*G, CY*G, 18*G, CY*G];
-  if(axis==='d1') return [4*G, 1*G, 16*G, 13*G];       // y-CY = x-CX
-  if(axis==='d2') return [4*G, 13*G, 16*G, 1*G];       // y-CY = -(x-CX)
-  if(axis==='triV') return [CX*G, 1*G, CX*G, 13*G];
-  if(axis==='triL') return [5*G, 13*G, 12.5*G, 0*G];
-  if(axis==='triR') return [15*G, 13*G, 7.5*G, 0*G];
-  return null;
-}
-function drawAxes(axes){const g=S('g',{id:'axes',visibility:'hidden'});axes.forEach(a=>{const l=axisLine(a);if(l)S('line',{x1:l[0],y1:l[1],x2:l[2],y2:l[3],stroke:'#e05a3b','stroke-width':5,'stroke-dasharray':'12 9','stroke-linecap':'round'},g);});}
-function showAxes(){const g=document.getElementById('axes'); if(g)g.setAttribute('visibility','visible');}
+function S(tag,attrs={},parent=svg){const e=document.createElementNS("http://www.w3.org/2000/svg",tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);parent.appendChild(e);return e}
+function round(x){return Math.abs(x-Math.round(x))<1e-9?Math.round(x):+x.toFixed(3)}
+function grid(){S("rect",{x:0,y:0,width:W,height:H,fill:"#fff"});for(let x=0;x<=W;x+=GRID)S("line",{x1:x,y1:0,x2:x,y2:H,stroke:"#b8d1ea","stroke-width":x%150===0?1.4:.8});for(let y=0;y<=H;y+=GRID)S("line",{x1:0,y1:y,x2:W,y2:y,stroke:"#b8d1ea","stroke-width":y%150===0?1.4:.8})}
+function P(pts){return pts.map(p=>`${round(p[0])},${round(p[1])}`).join(" ")}
+function drawPolygon(pts){S("polygon",{points:P(pts),fill:"rgba(78,131,189,.12)",stroke:"#4e83bd","stroke-width":4,"stroke-linejoin":"miter"})}
+function dist2(p,q){const dx=p[0]-q[0],dy=p[1]-q[1];return dx*dx+dy*dy}
+function normLine(a,b,c){const len=Math.hypot(a,b);a/=len;b/=len;c/=len;if(a<-EPS||(Math.abs(a)<EPS&&b<-EPS)){a=-a;b=-b;c=-c}if(Math.abs(a)<EPS)a=0;if(Math.abs(b)<EPS)b=0;if(Math.abs(c)<EPS)c=0;return[a,b,c]}
+function lineThrough(p,q){return normLine(p[1]-q[1],q[0]-p[0],-((p[1]-q[1])*p[0]+(q[0]-p[0])*p[1]))}
+function perpBisector(p,q){const mx=(p[0]+q[0])/2,my=(p[1]+q[1])/2,a=q[0]-p[0],b=q[1]-p[1];return normLine(a,b,-(a*mx+b*my))}
+function reflectPoint(p,l){const[a,b,c]=l,d=a*p[0]+b*p[1]+c;return[p[0]-2*a*d,p[1]-2*b*d]}
+function closePoint(p,q,tol=1e-4){return Math.abs(p[0]-q[0])<tol&&Math.abs(p[1]-q[1])<tol}
+function sameCyclic(A,B){const n=A.length;if(B.length!==n)return false;for(let s=0;s<n;s++){let ok=true;for(let i=0;i<n;i++){if(!closePoint(A[i],B[(i+s)%n])){ok=false;break}}if(ok)return true}for(let s=0;s<n;s++){let ok=true;for(let i=0;i<n;i++){const j=(s-i+n)%n;if(!closePoint(A[i],B[j])){ok=false;break}}if(ok)return true}return false}
+function validAxis(pts,line){return sameCyclic(pts,pts.map(p=>reflectPoint(p,line)))}
+function lineKey(l){return l.map(v=>Math.round(v*100000)/100000).join(",")}
+function findAxes(pts){const cand=[],n=pts.length;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){cand.push(lineThrough(pts[i],pts[j]));cand.push(perpBisector(pts[i],pts[j]))}const found=[],keys=new Set();for(const l of cand){const k=lineKey(l);if(keys.has(k))continue;keys.add(k);if(validAxis(pts,l))found.push(l)}found.sort((a,b)=>axisSort(a)-axisSort(b));return found}
+function axisSort(l){const[a,b]=l;if(Math.abs(b)<1e-5)return 0;if(Math.abs(a)<1e-5)return 1;return 2+Math.atan2(-a,b)}
+function segmentInBox(a,b,c,minX,minY,maxX,maxY){const pts=[];if(Math.abs(b)>EPS){let y=-(a*minX+c)/b;if(y>=minY-EPS&&y<=maxY+EPS)pts.push([minX,y]);y=-(a*maxX+c)/b;if(y>=minY-EPS&&y<=maxY+EPS)pts.push([maxX,y])}if(Math.abs(a)>EPS){let x=-(b*minY+c)/a;if(x>=minX-EPS&&x<=maxX+EPS)pts.push([x,minY]);x=-(b*maxY+c)/a;if(x>=minX-EPS&&x<=maxX+EPS)pts.push([x,maxY])}const u=[];for(const p of pts)if(!u.some(q=>dist2(p,q)<1e-6))u.push(p);if(u.length<2)return null;u.sort((p,q)=>p[0]===q[0]?p[1]-q[1]:p[0]-q[0]);return[u[0],u[u.length-1]]}
+function drawAxis(line,parent){const[a,b,c]=line,p=segmentInBox(a,b,c,-70,-70,W+70,H+70);if(!p)return;S("line",{x1:round(p[0][0]),y1:round(p[0][1]),x2:round(p[1][0]),y2:round(p[1][1]),stroke:"#e45b3f","stroke-width":4,"stroke-dasharray":"12 8","stroke-linecap":"round"},parent)}
+function centered(points,dx=0,dy=0){const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2,tx=W/2+dx-cx,ty=H/2+dy-cy;return points.map(p=>[p[0]+tx,p[1]+ty])}
+function make(name,pts,group="Form"){const axes=findAxes(pts);return{name,pts,axes,answer:axes.length,group}}
 
-// Spiegelungen auf Rasterpunkten. Für das gleichseitige Dreieck werden bewusst feste,
-// geprüfte Figuren benutzt, weil ein echtes gleichseitiges Dreieck nicht vollständig auf einem quadratischen Raster liegen kann.
-const mirrors={
-  v:p=>[2*CX-p[0],p[1]],
-  h:p=>[p[0],2*CY-p[1]],
-  d1:p=>[CX+(p[1]-CY), CY+(p[0]-CX)],
-  d2:p=>[CX-(p[1]-CY), CY-(p[0]-CX)]
-};
-function hasAxis(pts, axis){const set=new Set(pts.map(key));return pts.every(p=>set.has(key(mirrors[axis](p))));}
-function computedAxes(pts, allowed=['v','h','d1','d2']){return allowed.filter(a=>hasAxis(pts,a));}
-function assertAxes(fig){
-  if(fig.fixedAxes){ fig.axes=fig.fixedAxes; fig.a=fig.axes.length; return fig; }
-  fig.axes=computedAxes(fig.pts, fig.allowed||['v','h','d1','d2']);
-  fig.a=fig.axes.length;
-  return fig;
-}
-
-// Figuren: alle Punkte liegen auf Rasterpunkten. Achsenzahl wird berechnet, nicht erfunden.
-const rawFigs=[
-  {name:'Quadrat gross', pts:[[7,4],[13,4],[13,10],[7,10]]},
-  {name:'Quadrat klein', pts:[[8,5],[12,5],[12,9],[8,9]]},
-  {name:'Rechteck breit', pts:[[5,5],[15,5],[15,9],[5,9]]},
-  {name:'Rechteck hoch', pts:[[8,3],[12,3],[12,11],[8,11]]},
-  {name:'Raute breit', pts:[[10,3],[16,7],[10,11],[4,7]]},
-  {name:'Raute schmal', pts:[[10,2],[14,7],[10,12],[6,7]]},
-  {name:'Drachenraute', pts:[[10,2],[14,7],[10,12],[7,7]], allowed:['v','h','d1','d2']},
-  {name:'Drachen breit', pts:[[10,3],[15,7],[10,11],[8,7]]},
-  {name:'Gleichschenkliges Dreieck', pts:[[10,2],[5,11],[15,11]]},
-  {name:'Dreieck schmal', pts:[[10,2],[7,12],[13,12]]},
-  {name:'Gleichseitiges Dreieck', pts:[[10,2],[5,11],[15,11]], fixedAxes:['triV','triL','triR']},
-  {name:'I-Träger', pts:[[5,3],[15,3],[15,5],[12,5],[12,9],[15,9],[15,11],[5,11],[5,9],[8,9],[8,5],[5,5]]},
-  {name:'T-Form', pts:[[5,3],[15,3],[15,5],[12,5],[12,12],[8,12],[8,5],[5,5]]},
-  {name:'Pluszeichen', pts:[[9,2],[11,2],[11,6],[15,6],[15,8],[11,8],[11,12],[9,12],[9,8],[5,8],[5,6],[9,6]]},
-  {name:'Kreuz breit', pts:[[8,2],[12,2],[12,5],[16,5],[16,9],[12,9],[12,12],[8,12],[8,9],[4,9],[4,5],[8,5]]},
-  {name:'Haus symmetrisch', pts:[[6,7],[10,3],[14,7],[14,12],[6,12]]},
-  {name:'Krone', pts:[[5,11],[5,5],[8,8],[10,3],[12,8],[15,5],[15,11]]},
-  {name:'Schild', pts:[[6,3],[14,3],[14,7],[10,12],[6,7]]},
-  {name:'Pfeil nach oben', pts:[[10,2],[16,7],[13,7],[13,12],[7,12],[7,7],[4,7]]},
-  {name:'Sanduhr', pts:[[6,3],[14,3],[10,7],[14,11],[6,11],[10,7]]},
-  {name:'Achteck', pts:[[7,3],[13,3],[16,6],[16,8],[13,11],[7,11],[4,8],[4,6]]},
-  {name:'Kronen-Sechseck', pts:[[6,4],[14,4],[16,7],[14,10],[6,10],[4,7]]},
-  {name:'Symmetrisches Fünfeck', pts:[[10,2],[15,6],[13,12],[7,12],[5,6]]},
-  {name:'Symmetrischer Pfeil', pts:[[10,2],[15,7],[12,7],[12,12],[8,12],[8,7],[5,7]]},
-  {name:'Breiter Kelch', pts:[[5,3],[15,3],[13,7],[11,7],[11,12],[9,12],[9,7],[7,7]]},
-  {name:'Doppelhaus', pts:[[5,7],[7,4],[9,7],[10,5],[11,7],[13,4],[15,7],[15,12],[5,12]]},
-  {name:'Treppen-Schild', pts:[[8,3],[12,3],[12,5],[14,5],[14,9],[10,12],[6,9],[6,5],[8,5]]},
-  {name:'Pfeil links-rechts', pts:[[3,7],[7,3],[7,5],[13,5],[13,3],[17,7],[13,11],[13,9],[7,9],[7,11]]},
-  {name:'Eckiger Stern', pts:[[10,2],[12,5],[16,5],[13,8],[14,12],[10,10],[6,12],[7,8],[4,5],[8,5]]},
-  {name:'Vierfach-Stern', pts:[[10,2],[12,6],[16,7],[12,8],[10,12],[8,8],[4,7],[8,6]]},
-  {name:'Asymmetrisches Fünfeck', pts:[[5,3],[13,4],[16,8],[10,12],[4,9]]},
-  {name:'Asymmetrischer Blitz', pts:[[8,2],[15,2],[11,6],[15,6],[6,13],[9,8],[5,8]]},
-  {name:'Unregelmässiges Vieleck', pts:[[5,3],[13,2],[16,7],[14,12],[7,11],[4,7]]},
-  {name:'Schiefe Fahne', pts:[[6,3],[15,4],[14,8],[8,7],[8,12],[6,12]]},
-  {name:'Asymmetrische Hausform', pts:[[5,7],[9,3],[15,6],[14,12],[5,12]]},
-  {name:'Asymmetrische Treppe', pts:[[5,3],[14,3],[14,5],[11,5],[11,7],[15,7],[15,11],[5,11]]},
-  {name:'Schiefer Pfeil', pts:[[4,6],[12,3],[11,6],[16,8],[10,12],[11,9],[5,9]]},
-  {name:'Freies Vieleck', pts:[[6,2],[14,4],[15,9],[11,12],[5,10],[4,5]]}
-].map(assertAxes);
-
-// Für Aufgaben mit 3 Achsen wird die Dreiecks-Aufgabe separat genutzt; alle anderen werden geprüft.
-const figs=rawFigs.filter(f=>f.a>=0 && f.a<=4);
-
-const taskModes=[
-  {name:'Anzahl bestimmen', text:'Wie viele Symmetrieachsen hat die Figur?'},
-  {name:'Prüfmeister', text:'Prüfe die Figur genau: Wie viele Achsen sind wirklich vorhanden?'},
-  {name:'Schneller Blick', text:'Zähle nur echte Spiegelachsen. Wie viele sind es?'}
+const figs=[
+make("Quadrat gross",centered([[210,120],[390,120],[390,300],[210,300]]),"Quadrat"),
+make("Quadrat klein",centered([[240,150],[360,150],[360,270],[240,270]]),"Quadrat"),
+make("Rechteck breit",centered([[150,150],[450,150],[450,270],[150,270]]),"Rechteck"),
+make("Rechteck hoch",centered([[240,75],[360,75],[360,345],[240,345]]),"Rechteck"),
+make("Raute breit",centered([[300,90],[480,210],[300,330],[120,210]]),"Raute"),
+make("Raute schmal",centered([[300,60],[390,210],[300,360],[210,210]]),"Raute"),
+make("Drachenraute gross",centered([[300,60],[420,210],[300,360],[240,210]]),"Drachenraute"),
+make("Drachenraute klein",centered([[300,90],[390,210],[300,330],[255,210]]),"Drachenraute"),
+make("Gleichschenkliges Dreieck breit",centered([[300,75],[150,315],[450,315]]),"Dreieck"),
+make("Gleichschenkliges Dreieck schmal",centered([[300,60],[210,330],[390,330]]),"Dreieck"),
+make("Gleichseitiges Dreieck",centered([[300,80],[144.115,350],[455.885,350]]),"Dreieck"),
+make("Kleines gleichseitiges Dreieck",centered([[300,105],[196.077,285],[403.923,285]]),"Dreieck"),
+make("I-Träger",centered([[150,75],[450,75],[450,120],[330,120],[330,300],[450,300],[450,345],[150,345],[150,300],[270,300],[270,120],[150,120]]),"Vieleck"),
+make("T-Form",centered([[150,75],[450,75],[450,135],[330,135],[330,345],[270,345],[270,135],[150,135]]),"Vieleck"),
+make("Pluszeichen",centered([[270,60],[330,60],[330,150],[420,150],[420,210],[330,210],[330,300],[270,300],[270,210],[180,210],[180,150],[270,150]]),"Vieleck"),
+make("Kreuz breit",centered([[240,60],[360,60],[360,150],[480,150],[480,240],[360,240],[360,330],[240,330],[240,240],[120,240],[120,150],[240,150]]),"Vieleck"),
+make("Symmetrisches Haus",centered([[180,180],[300,60],[420,180],[420,330],[180,330]]),"Vieleck"),
+make("Krone",centered([[150,300],[150,150],[240,225],[300,90],[360,225],[450,150],[450,300]]),"Vieleck"),
+make("Schild",centered([[180,90],[420,90],[420,210],[300,345],[180,210]]),"Vieleck"),
+make("Pfeil",centered([[120,180],[300,60],[480,180],[390,180],[390,300],[210,300],[210,180]]),"Vieleck"),
+make("Sanduhr",centered([[180,75],[420,75],[300,210],[420,345],[180,345],[300,210]]),"Vieleck"),
+make("Symmetrisches Achteck",centered([[210,90],[390,90],[480,180],[480,240],[390,330],[210,330],[120,240],[120,180]]),"Vieleck"),
+make("Treppenschild",centered([[210,90],[390,90],[390,150],[450,150],[450,270],[390,270],[390,330],[210,330],[210,270],[150,270],[150,150],[210,150]]),"Vieleck"),
+make("Quadratstern",centered([[300,60],[345,150],[450,150],[375,225],[405,330],[300,270],[195,330],[225,225],[150,150],[255,150]]),"Vieleck"),
+make("Vierfach-Sägezahn",centered([[300,60],[330,150],[420,150],[360,210],[420,270],[330,270],[300,360],[270,270],[180,270],[240,210],[180,150],[270,150]]),"Vieleck"),
+make("Asymmetrisches Fünfeck",centered([[180,90],[390,120],[450,270],[300,345],[150,240]]),"Asymmetrisch"),
+make("Asymmetrischer Blitz",centered([[240,60],[420,60],[330,180],[450,180],[210,360],[285,225],[165,225]]),"Asymmetrisch"),
+make("Unregelmässiges Vieleck",centered([[150,90],[360,60],[450,180],[390,330],[210,300],[120,210]]),"Asymmetrisch"),
+make("Schiefe Fahne",centered([[180,90],[420,120],[390,240],[210,210],[210,345],[180,345]]),"Asymmetrisch"),
+make("Asymmetrisches Haus",centered([[180,180],[300,60],[420,180],[420,330],[180,330],[180,180],[360,120],[360,75],[405,75],[405,165]]),"Asymmetrisch")
 ];
-function available(){return figs.filter(f=>(used.get(f.name)||0)<2);}
-function pick(){let pool=available(); if(pool.length===0){used.clear(); pool=figs.slice();} const f=pool[Math.floor(Math.random()*pool.length)]; used.set(f.name,(used.get(f.name)||0)+1); return f;}
-function drawFigure(f){clear(); grid(); poly(f.pts); drawAxes(f.axes);}
-function next(){ if(correct>=30){finish(); return;} current=pick(); const mode=taskModes[Math.floor(Math.random()*taskModes.length)]; taskTypeEl.textContent=mode.name; questionEl.textContent=mode.text; drawFigure(current); msg.textContent='Wähle eine Antwort.'; msg.className='message hint'; nextBtn.hidden=true; buttons.forEach(b=>b.disabled=false); }
-function finish(){clear();grid();S('text',{x:300,y:155,'text-anchor':'middle','font-size':36,'font-weight':900,fill:'#162738'}).textContent='Geschafft!';S('text',{x:300,y:205,'text-anchor':'middle','font-size':23,fill:'#162738'}).textContent=`30 richtige Figuren in ${tries} Versuchen.`;const pct=Math.round(100*correct/Math.max(tries,1));S('text',{x:300,y:245,'text-anchor':'middle','font-size':22,fill:'#162738'}).textContent=`Trefferquote: ${pct} %`;buttons.forEach(b=>b.disabled=true);nextBtn.hidden=true;msg.textContent='Sehr gut gearbeitet.';msg.className='message correct';}
-buttons.forEach(b=>b.addEventListener('click',()=>{if(!current)return; tries++; triesEl.textContent=tries; const ans=Number(b.dataset.answer); showAxes(); buttons.forEach(x=>x.disabled=true); if(ans===current.a){correct++; correctEl.textContent=correct; msg.textContent=`Richtig: Diese Figur hat ${current.a} ${current.a===1?'Symmetrieachse':'Symmetrieachsen'}.`; msg.className='message correct';}else{msg.textContent=`Nicht ganz: Diese Figur hat ${current.a} ${current.a===1?'Symmetrieachse':'Symmetrieachsen'}.`; msg.className='message wrong';} nextBtn.hidden=false; nextBtn.textContent=correct>=30?'Auswertung anzeigen':'Nächste Figur';}));
-nextBtn.addEventListener('click',()=>{nextBtn.textContent='Nächste Figur'; next();});
+
+console.table(figs.map(f=>({Figur:f.name,Achsen:f.answer,Gruppe:f.group})));
+
+function available(){return figs.filter(f=>(used.get(f.name)||0)<2)}
+function pick(){let pool=available();if(pool.length===0){used.clear();pool=figs}const weighted=[];for(const f of pool){const w=f.group==="Vieleck"&&f.answer>0?4:f.group==="Asymmetrisch"?2:1;for(let i=0;i<w;i++)weighted.push(f)}const f=weighted[Math.floor(Math.random()*weighted.length)];used.set(f.name,(used.get(f.name)||0)+1);return f}
+function drawFigure(f,show=false){svg.innerHTML="";grid();drawPolygon(f.pts);const g=S("g",{id:"axes",visibility:show?"visible":"hidden"});for(const line of f.axes)drawAxis(line,g);for(const p of f.pts)S("circle",{cx:round(p[0]),cy:round(p[1]),r:3.2,fill:"#4e83bd"})}
+function next(){if(correct>=30){finish();return}current=pick();drawFigure(current,false);msg.textContent="Wähle eine Antwort.";msg.className="";modeLabel.textContent=current.group;nextBtn.hidden=true;buttons.forEach(b=>b.disabled=false)}
+function showAxes(){const g=document.getElementById("axes");if(g)g.setAttribute("visibility","visible")}
+function finish(){svg.innerHTML="";grid();S("text",{x:300,y:160,"text-anchor":"middle","font-size":36,"font-weight":900,fill:"#1b2a38"}).textContent="Geschafft!";S("text",{x:300,y:212,"text-anchor":"middle","font-size":22,fill:"#1b2a38"}).textContent=`30 richtige Figuren in ${tries} Versuchen.`;buttons.forEach(b=>b.disabled=true);nextBtn.hidden=true;msg.textContent="Auswertung abgeschlossen.";msg.className="correct"}
+buttons.forEach(b=>b.addEventListener("click",()=>{if(!current)return;tries++;triesEl.textContent=tries;const ans=Number(b.dataset.answer);showAxes();buttons.forEach(x=>x.disabled=true);if(ans===current.answer){correct++;correctEl.textContent=correct;msg.textContent=`Richtig: Diese Figur hat ${current.answer} ${current.answer===1?"Symmetrieachse":"Symmetrieachsen"}.`;msg.className="correct"}else{msg.textContent=`Nicht ganz: Diese Figur hat ${current.answer} ${current.answer===1?"Symmetrieachse":"Symmetrieachsen"}.`;msg.className="wrong"}nextBtn.hidden=false;if(correct>=30)nextBtn.textContent="Auswertung anzeigen"}));
+nextBtn.addEventListener("click",()=>{nextBtn.textContent="Nächste Figur";next()});
 next();
