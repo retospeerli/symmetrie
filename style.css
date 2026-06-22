@@ -1,1 +1,16 @@
-*{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#eaf2f9;color:#162738}.app{width:min(960px,96vw);margin:0 auto;padding:18px}header{text-align:center;margin-bottom:12px}h1{margin:.2rem 0;font-size:2rem}p{margin:.2rem 0}.panel{background:#fff;border-radius:16px;box-shadow:0 6px 20px rgba(20,60,95,.12);padding:12px}.stats{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}.task{text-align:center}#question{font-weight:800;margin-bottom:8px}svg{width:100%;max-width:760px;background:#fff;border:1px solid #b8d1ea;border-radius:10px}.answers{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}button{border:0;border-radius:12px;padding:12px 15px;font-weight:800;cursor:pointer;background:#7f9bb8;color:#fff}button:hover:not(:disabled){filter:brightness(.95)}button:disabled{opacity:.55;cursor:default}.next{background:#174a78;margin-top:12px}.message{font-weight:800;min-height:28px;margin-top:10px}.correct{color:#1f7a3d}.wrong{color:#a83220}.hint{color:#174a78}@media(max-width:560px){.app{padding:8px}.answers button{flex:1 1 30%;padding:10px 6px}}
+:root{--blue:#4e83bd;--axis:#e25b3f;--ok:#207744;--bad:#a72716}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#eaf2fa;color:#142536}
+.app{width:min(920px,96vw);margin:0 auto;padding:18px 0 28px;text-align:center}
+h1{margin:0 0 4px;font-size:clamp(24px,4vw,38px)}
+.lead{margin:0 0 8px;font-size:20px;font-weight:700}
+.topbar{width:min(840px,96vw);margin:0 auto 6px;display:flex;justify-content:space-between;gap:10px;font-size:15px}
+#svg{display:block;width:min(840px,96vw);height:auto;margin:0 auto 16px;background:white;border:2px solid #a9c9eb;border-radius:10px}
+.buttons{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:8px 0}
+button{border:0;border-radius:12px;padding:13px 18px;background:#194f80;color:white;font-size:16px;font-weight:800;cursor:pointer}
+button[data-answer]{background:#9bb2c8}
+button:hover:not(:disabled){filter:brightness(1.05)}
+button:disabled{opacity:.72;cursor:not-allowed}
+#message{min-height:26px;margin:8px 0 14px;font-size:18px;font-weight:900}
+#message.correct{color:var(--ok)}
+#message.wrong{color:var(--bad)}
